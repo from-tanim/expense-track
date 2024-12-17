@@ -1,15 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const expenseForm = document.getElementById('expense-form');
+    const expensesList = document.getElementById('expenses-list');
     const downloadPdfButton = document.getElementById('download-pdf');
-    const expenseCategories = document.getElementById('expense-categories');
-    let expenses = {
-        "Food": [],
-        "Accessories": [],
-        "Book": [],
-        "Transport": [],
-        "Fees": [],
-        "Others": []
-    };
+    let expenses = [];
 
     // Handle form submission
     expenseForm.addEventListener('submit', (e) => {
@@ -32,95 +25,114 @@ document.addEventListener('DOMContentLoaded', () => {
             notes
         };
 
-        // Add expense to the appropriate category
-        expenses[category].push(expense);
-        updateCategories();
+        expenses.push(expense);
+        updateTable();
         expenseForm.reset();
     });
 
-    // Update the displayed categories and expenses list
-    function updateCategories() {
-        expenseCategories.innerHTML = '';
+    // Update the expenses table, group by category
+    function updateTable() {
+        expensesList.innerHTML = '';
 
-        // Iterate over each category
-        for (let category in expenses) {
-            if (expenses[category].length > 0) {
-                const categorySection = document.createElement('div');
-                categorySection.classList.add('mb-6');
+        // Group expenses by category
+        const groupedExpenses = groupExpensesByCategory(expenses);
 
-                const categoryTitle = document.createElement('h3');
-                categoryTitle.classList.add('text-xl', 'font-semibold', 'mb-2');
-                categoryTitle.textContent = category;
-                categorySection.appendChild(categoryTitle);
+        // For each category, create a section
+        for (let category in groupedExpenses) {
+            const categoryExpenses = groupedExpenses[category];
 
-                const table = document.createElement('table');
-                table.classList.add('min-w-full', 'table-auto', 'border-collapse');
+            // Create a section header
+            const categorySection = document.createElement('div');
+            categorySection.classList.add('mb-4');
+            const sectionTitle = document.createElement('h3');
+            sectionTitle.classList.add('text-xl', 'font-bold', 'mb-2');
+            sectionTitle.textContent = category;
+            categorySection.appendChild(sectionTitle);
 
-                // Table Header
-                const thead = document.createElement('thead');
-                const headerRow = document.createElement('tr');
-                headerRow.innerHTML = `
+            // Create a table for this category
+            const table = document.createElement('table');
+            table.classList.add('min-w-full', 'table-auto', 'border-collapse');
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
                     <th class="px-4 py-2 text-left border">Date</th>
+                    <th class="px-4 py-2 text-left border">Category</th>
                     <th class="px-4 py-2 text-left border">Amount</th>
                     <th class="px-4 py-2 text-left border">Notes</th>
                     <th class="px-4 py-2 text-left border">Actions</th>
-                `;
-                thead.appendChild(headerRow);
-                table.appendChild(thead);
+                </tr>
+            `;
+            table.appendChild(thead);
 
-                // Table Body
-                const tbody = document.createElement('tbody');
-                expenses[category].forEach((expense, index) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-4 py-2 border">${expense.date}</td>
-                        <td class="px-4 py-2 border">$${expense.amount.toFixed(2)}</td>
-                        <td class="px-4 py-2 border">${expense.notes || '-'}</td>
-                        <td class="px-4 py-2 border text-center">
-                            <button class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600" onclick="deleteExpense('${category}', ${index})">Delete</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-                table.appendChild(tbody);
-                categorySection.appendChild(table);
-                expenseCategories.appendChild(categorySection);
-            }
+            const tbody = document.createElement('tbody');
+            categoryExpenses.forEach((expense, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2 border">${expense.date}</td>
+                    <td class="px-4 py-2 border">${expense.category}</td>
+                    <td class="px-4 py-2 border">$${expense.amount.toFixed(2)}</td>
+                    <td class="px-4 py-2 border">${expense.notes || '-'}</td>
+                    <td class="px-4 py-2 border">
+                        <button class="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600 delete-btn" data-index="${index}">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
+            categorySection.appendChild(table);
+            expensesList.appendChild(categorySection);
         }
+
+        // Add delete button event listeners
+        const deleteButtons = document.querySelectorAll('.delete-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = e.target.getAttribute('data-index');
+                deleteExpense(index);
+            });
+        });
+    }
+
+    // Group expenses by category
+    function groupExpensesByCategory(expenses) {
+        const grouped = {
+            'Food': [],
+            'Accessories': [],
+            'Book': [],
+            'Transport': [],
+            'Fees': [],
+            'Others': []
+        };
+
+        expenses.forEach(expense => {
+            grouped[expense.category].push(expense);
+        });
+
+        return grouped;
     }
 
     // Delete an expense
-    window.deleteExpense = function(category, index) {
-        expenses[category].splice(index, 1);
-        updateCategories();
-    };
+    function deleteExpense(index) {
+        expenses.splice(index, 1);
+        updateTable();
+    }
 
     // Generate and download PDF
     downloadPdfButton.addEventListener('click', () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.text("Monthly Expenses Report", 14, 10);
-
-        // Iterate over categories and expenses
-        let y = 20;
-        for (let category in expenses) {
-            if (expenses[category].length > 0) {
-                doc.text(category, 14, y);
-                y += 10;
-
-                doc.autoTable({
-                    startY: y,
-                    head: [['Date', 'Amount', 'Notes']],
-                    body: expenses[category].map(expense => [
-                        expense.date,
-                        `$${expense.amount.toFixed(2)}`,
-                        expense.notes || '-'
-                    ]),
-                });
-
-                y = doc.lastAutoTable.finalY + 10; // Update y position for next category
-            }
-        }
+        doc.autoTable({
+            startY: 20,
+            head: [['Date', 'Category', 'Amount', 'Notes']],
+            body: expenses.map(expense => [
+                expense.date,
+                expense.category,
+                `$${expense.amount.toFixed(2)}`,
+                expense.notes || '-'
+            ]),
+        });
         doc.save('expenses-report.pdf');
     });
 });
