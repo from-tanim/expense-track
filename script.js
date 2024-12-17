@@ -123,16 +123,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.text("Monthly Expenses Report", 14, 10);
-        doc.autoTable({
-            startY: 20,
-            head: [['Date', 'Category', 'Amount', 'Notes']],
-            body: expenses.map(expense => [
+
+        // Group the expenses by category for the report
+        const groupedExpenses = groupExpensesByCategory(expenses);
+        
+        let yOffset = 20;  // Initial Y position for the PDF content
+
+        // Loop through each category
+        for (let category in groupedExpenses) {
+            doc.text(category, 14, yOffset);
+            yOffset += 10;
+
+            // Create a table for each category
+            const tableData = groupedExpenses[category].map(expense => [
                 expense.date,
                 expense.category,
                 `$${expense.amount.toFixed(2)}`,
                 expense.notes || '-'
-            ]),
-        });
+            ]);
+
+            // Add a table for this category
+            doc.autoTable({
+                startY: yOffset,
+                head: [['Date', 'Category', 'Amount', 'Notes']],
+                body: tableData,
+                theme: 'grid'
+            });
+
+            // Update Y offset for next category
+            yOffset = doc.lastAutoTable.finalY + 10;
+        }
+
+        // Save the PDF with the name 'expenses-report.pdf'
         doc.save('expenses-report.pdf');
     });
 });
